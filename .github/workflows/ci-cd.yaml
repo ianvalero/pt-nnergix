@@ -1,0 +1,73 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ==========================================
+  # FASE 1: TESTING
+  # ==========================================
+  test:
+    name: Ejecutar Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Crear fichero .env falso para CI/CD
+        run: |
+          touch .env
+          echo "DB_USER=usuario_falso" >> .env
+          echo "DB_PASSWORD=password_falso" >> .env
+          echo "DB_NAME=db_falsa" >> .env
+          echo "HTTP_PROXY=" >> .env
+          echo "HTTPS_PROXY=" >> .env
+
+      - name: Levantar entorno con Docker Compose
+        run: docker compose up -d --build
+
+      - name: Esperar a que la app esté lista
+        run: sleep 5
+
+      - name: Ejecutar Pytest
+        run: docker compose exec -T app uv run pytest tests/ -v
+
+      - name: Limpiar entorno
+        if: always()
+        run: docker compose down
+
+  # ==========================================
+  # FASE 2: (BUILD)
+  # ==========================================
+  build:
+    name: Compilar Imagen Docker
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compilar y Subir imagen de la App
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="ghcr.io/$OWNER/pt-nnergix-app:latest"
+          docker build -t $IMAGE_NAME .
+          docker push $IMAGE_NAME
