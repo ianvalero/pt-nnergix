@@ -11,7 +11,7 @@ Construida con **FastAPI**, **PostgreSQL** y **BeautifulSoup**.
 ## 🚀 Instalación y Ejecución
 ### 1. Clonar el repositorio
 ```bash
-git clone <repository-url>
+git clone https://github.com/ianvalero/pt-nnergix.git
 cd pt_nnergix
 ```
 
